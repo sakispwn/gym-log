@@ -1,0 +1,776 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gym Log</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Gym Log">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+
+/* Layout: single column, big title bar, routine cards, exercise tables with per-set rows,
+   floating pill nav + floating rest-timer bar. Dark-first, black ground, blue action colour. */
+:root {
+  --bg: #000000;
+  --surface: #1c1c1e;
+  --surface2: #2a2a2d;
+  --ink: #f2f2f4;
+  --muted: #8e8e93;
+  --line: #2c2c2e;
+  --accent: #3b8bf6;
+  --accent-text: #5aa0ff;
+  --accent-ink: #ffffff;
+  --ok: #2fb86a;
+  --ok-soft: #12301f;
+  --warm: #f5b21a;
+  --drop: #b57bff;
+  --fail: #f0583a;
+  --danger: #ff6a5e;
+  --font: "Figtree", "Helvetica Neue", Arial, sans-serif;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f2f2f6; --surface: #ffffff; --surface2: #e8e8ed; --ink: #111113; --muted: #6c6c70; --line: #dcdce1;
+    --accent: #2f7ae5; --accent-text: #1d63c8; --ok: #1f9a57; --ok-soft: #d9f2e3; --warm: #b87a00; --drop: #7a3fd1;
+    --fail: #d33f20; --danger: #d93025; color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #f2f2f6; --surface: #ffffff; --surface2: #e8e8ed; --ink: #111113; --muted: #6c6c70; --line: #dcdce1;
+  --accent: #2f7ae5; --accent-text: #1d63c8; --ok: #1f9a57; --ok-soft: #d9f2e3; --warm: #b87a00; --drop: #7a3fd1;
+  --fail: #d33f20; --danger: #d93025; color-scheme: light;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 16px; line-height: 1.35;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 170px;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+svg { display: block; }
+.wrap { max-width: 640px; margin: 0 auto; }
+.stack { display: flex; flex-direction: column; gap: 14px; }
+h1, h2, h3, p { margin: 0; }
+.muted { color: var(--muted); }
+.eyebrow { font-size: 14px; font-weight: 600; color: var(--muted); }
+
+/* bars */
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0 10px; }
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); }
+.bar h1 { font-size: 34px; font-weight: 700; letter-spacing: -.01em; }
+.bar h2 { font-size: 18px; font-weight: 600; text-align: center; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-r { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.sync { font-size: 12px; color: var(--muted); }
+.circle { width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--surface); display: grid; place-items: center; flex: none; }
+.circle svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.chip { border: 0; background: var(--surface); color: var(--muted); border-radius: 999px; padding: 4px 12px; font-size: 13px; font-weight: 600; min-height: 30px; }
+.chip[aria-pressed="true"] { color: var(--accent-text); }
+
+/* buttons */
+.btn { border: 0; background: var(--surface2); border-radius: 10px; padding: 0 16px; min-height: 46px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); }
+.btn.small { min-height: 38px; padding: 0 14px; font-size: 15px; }
+.btn.block { width: 100%; }
+.btn.plain { background: transparent; color: var(--danger); }
+.btn.armed { background: var(--danger); color: #fff; }
+.btn.text { background: transparent; color: var(--accent-text); }
+.btn svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.tile { border: 0; background: var(--surface); border-radius: 12px; min-height: 58px; padding: 0 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.tile svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* routine cards */
+.rcard { background: var(--surface); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.rhead { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.rhead h3 { font-size: 20px; font-weight: 700; overflow-wrap: anywhere; }
+.dots { border: 0; background: transparent; width: 40px; height: 36px; margin: -6px -8px 0 0; display: grid; place-items: center; color: var(--muted); flex: none; }
+.dots svg { width: 22px; height: 22px; fill: currentColor; }
+.rex { color: var(--muted); font-size: 15px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 8px; overflow-wrap: anywhere; }
+.menu { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 8px; }
+.resume { background: var(--surface); border: 1px solid var(--accent); border-radius: 14px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.resume b { display: block; }
+.resume span { font-size: 14px; color: var(--muted); }
+.empty { background: var(--surface); border-radius: 14px; padding: 28px 18px; text-align: center; color: var(--muted); display: flex; flex-direction: column; gap: 14px; align-items: center; }
+
+/* routine name + exercises */
+.rname { width: 100%; height: 52px; border: 0; background: var(--surface); border-radius: 12px; padding: 0 16px; font-size: 22px; font-weight: 700; }
+.rname::placeholder, .srow input::placeholder, .addex input::placeholder { color: var(--muted); font-weight: 500; opacity: .7; }
+.ex { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ex-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.exname { font-size: 19px; font-weight: 600; color: var(--accent-text); overflow-wrap: anywhere; min-width: 0; }
+.rest { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 15px; flex-wrap: wrap; }
+.rest svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; flex: none; }
+.rest .btn { min-height: 32px; min-width: 36px; padding: 0 8px; font-size: 18px; border-radius: 8px; }
+.rest b { color: var(--ink); font-weight: 600; min-width: 74px; text-align: center; font-variant-numeric: tabular-nums; }
+.thead, .srow { display: grid; grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1fr); gap: 6px; align-items: center; }
+.live .thead, .srow.live { grid-template-columns: 40px minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr) 46px; }
+.thead { font-size: 12px; font-weight: 600; letter-spacing: .08em; color: var(--muted); text-align: center; padding: 0 8px; }
+.srow { padding: 4px 8px; border-radius: 10px; min-height: 52px; }
+.srow.alt { background: var(--surface); }
+.srow.done { background: var(--ok-soft); }
+.stype { border: 0; background: transparent; height: 44px; font-size: 18px; font-weight: 700; color: var(--muted); border-radius: 8px; }
+.stype.W { color: var(--warm); } .stype.D { color: var(--drop); } .stype.F { color: var(--fail); }
+.srow input { width: 100%; min-width: 0; height: 44px; border: 0; background: transparent; text-align: center; font-size: 18px; font-weight: 600; border-radius: 8px; font-variant-numeric: tabular-nums; padding: 0; }
+.srow input:focus { background: var(--surface2); outline: none; box-shadow: inset 0 0 0 2px var(--accent); }
+.prev { border: 0; background: transparent; color: var(--muted); font-size: 15px; height: 44px; font-variant-numeric: tabular-nums; border-radius: 8px; padding: 0; }
+.chk { width: 46px; height: 40px; border: 0; border-radius: 8px; background: var(--surface2); display: grid; place-items: center; padding: 0; }
+.chk svg { width: 22px; height: 22px; stroke: var(--muted); fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.srow.done .chk { background: var(--ok); }
+.srow.done .chk svg { stroke: #fff; }
+.addex { display: flex; gap: 8px; }
+.addex input { flex: 1; min-width: 0; height: 48px; border: 0; background: var(--surface); border-radius: 10px; padding: 0 14px; }
+
+/* session */
+.metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding-bottom: 4px; }
+.metrics small { display: block; font-size: 13px; color: var(--muted); }
+.metrics b { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* history */
+.summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.summary div { background: var(--surface); border-radius: 12px; padding: 12px; }
+.summary b { display: block; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.summary small { font-size: 12px; color: var(--muted); }
+.panel { background: var(--surface); border-radius: 14px; padding: 14px 16px; }
+.pr { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 15px; }
+.pr:first-of-type { border-top: 0; }
+.pr span { min-width: 0; overflow-wrap: anywhere; }
+.pr b { white-space: nowrap; font-variant-numeric: tabular-nums; }
+details.h { background: var(--surface); border-radius: 14px; }
+details.h summary { list-style: none; cursor: pointer; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+details.h summary::-webkit-details-marker { display: none; }
+details.h h3 { font-size: 18px; font-weight: 700; overflow-wrap: anywhere; }
+details.h .sub { font-size: 13px; color: var(--muted); }
+details.h .vol { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hbody { padding: 0 16px 14px; display: flex; flex-direction: column; gap: 10px; }
+.hbody p { font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+.hbody p b { display: block; color: var(--accent-text); font-size: 15px; font-weight: 600; }
+
+/* rest timer */
+#timer {
+  position: fixed; left: 0; right: 0; margin-inline: auto; z-index: 20; width: min(608px, calc(100% - 32px));
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 92px);
+  background: var(--surface2); color: var(--ink); border-radius: 14px; padding: 10px 12px;
+  display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 12px; align-items: center;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .35); border: 1px solid var(--line);
+}
+body.nonav #timer { bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); }
+#timer.done { background: var(--ok); color: #fff; border-color: var(--ok); }
+.ring { width: 52px; height: 52px; }
+.ring svg { width: 52px; height: 52px; transform: rotate(-90deg); }
+.ring circle { fill: none; stroke-width: 5; }
+.ring .bg { stroke: currentColor; opacity: .18; }
+.ring .fg { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset .25s linear; }
+#timer.done .fg { stroke: #fff; }
+.t-main { min-width: 0; }
+.t-main b { display: block; font-size: 30px; font-weight: 700; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.t-main span { display: block; font-size: 13px; opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-btns { display: flex; gap: 6px; }
+.t-btns button { border: 0; background: color-mix(in srgb, currentColor 14%, transparent); color: inherit; border-radius: 10px; min-width: 44px; height: 44px; font-weight: 600; font-size: 14px; padding: 0 10px; }
+@media (max-width: 420px) { .t-btns .adj { display: none; } }
+
+/* nav pill */
+nav { position: fixed; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); z-index: 15; display: flex; justify-content: center; pointer-events: none; }
+nav .pill { pointer-events: auto; display: flex; gap: 4px; padding: 5px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 6px 24px rgba(0, 0, 0, .35); }
+nav button { border: 0; background: transparent; color: var(--ink); width: 120px; height: 60px; border-radius: 999px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 13px; font-weight: 500; }
+nav button svg { width: 26px; height: 26px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+nav button[aria-current="page"] { background: var(--surface2); color: var(--accent-text); }
+
+/* picker */
+#picker { position: fixed; inset: 0; z-index: 40; background: var(--bg); overflow-y: auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-top: env(safe-area-inset-top, 0px); padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 32px); }
+.pk-in { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+.pk-bar { position: sticky; top: 0; z-index: 2; background: var(--bg); }
+.pk-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.pk-tile { border: 0; background: var(--surface); border-radius: 12px; padding: 14px; text-align: left; min-height: 70px; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+.pk-tile b { font-size: 18px; font-weight: 700; }
+.pk-tile small { color: var(--muted); font-size: 13px; }
+.pk-row { width: 100%; border: 0; background: var(--surface); border-radius: 12px; padding: 12px 14px; display: flex; gap: 12px; align-items: center; text-align: left; min-height: 62px; }
+.pk-row.custom { color: var(--accent-text); font-weight: 600; }
+.pk-ck { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; flex: none; }
+.pk-ck svg { width: 15px; height: 15px; stroke: transparent; fill: none; stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; }
+.pk-row.on { box-shadow: inset 0 0 0 2px var(--accent); }
+.pk-row.on .pk-ck { background: var(--accent); border-color: var(--accent); }
+.pk-row.on .pk-ck svg { stroke: #fff; }
+.pk-t { min-width: 0; }
+.pk-t b { display: block; font-weight: 600; font-size: 16px; overflow-wrap: anywhere; }
+.pk-t small { display: block; color: var(--muted); font-size: 13px; }
+.pk-note { background: var(--surface); border-radius: 12px; padding: 12px 14px; font-size: 14px; color: var(--muted); }
+#toast { position: fixed; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top, 0px) + 70px); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; z-index: 30; font-weight: 600; max-width: calc(100% - 32px); text-align: center; }
+@media (prefers-reduced-motion: reduce) { .ring .fg { transition: none; } }
+</style>
+</head>
+<body>
+
+
+<div class="wrap"><main id="view" class="stack"></main></div>
+
+<div id="timer" hidden>
+  <div class="ring"><svg viewBox="0 0 52 52" aria-hidden="true"><circle class="bg" cx="26" cy="26" r="22"></circle><circle class="fg" id="ring" cx="26" cy="26" r="22" stroke-dasharray="138.23" stroke-dashoffset="0"></circle></svg></div>
+  <div class="t-main"><b id="t-time">0:00</b><span id="t-label">Rest</span></div>
+  <div class="t-btns">
+    <button type="button" class="adj" data-t="minus" aria-label="15 seconds less">-15</button>
+    <button type="button" class="adj" data-t="plus" aria-label="15 seconds more">+15</button>
+    <button type="button" data-t="skip" id="t-skip">Skip</button>
+  </div>
+</div>
+<div id="picker" hidden role="dialog" aria-modal="true" aria-label="Add exercise">
+  <div class="pk-in">
+    <div class="bar pk-bar"><button class="circle" data-pk="back" aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"></path></svg></button><h2 id="pk-title">Add Exercise</h2><button class="btn primary small" data-pk="add" id="pk-add" hidden>Add</button></div>
+    <input class="rname" id="pk-q" type="search" placeholder="Search all exercises" autocomplete="off" aria-label="Search exercises">
+    <div id="pk-body" class="stack"></div>
+  </div>
+</div>
+<div id="toast" hidden role="status"></div>
+
+<nav id="nav" aria-label="Main"><div class="pill">
+  <button type="button" data-act="go" data-v="home" id="nav-home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9.5v5M6 7v10M18 7v10M21 9.5v5M6 12h12"></path></svg>Workout</button>
+  <button type="button" data-act="go" data-v="history" id="nav-history"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>History</button>
+</div></nav>
+
+
+<script>
+(function () {
+  "use strict";
+  var KEY = "gymlog.v2", DOC = "gym2";
+  var MUSCLES = [
+    { k: "Chest", note: "Upper chest is the clavicular head, mid and lower chest are the sternal head. A bench angle of 15–30° is enough to favour the upper chest." },
+    { k: "Back", note: "Pulldowns and pull-ups load the lats most. Rows with the elbows out wider shift work to the mid back (rhomboids, mid traps)." },
+    { k: "Traps", note: "Upper traps shrug the shoulders up, mid traps pull them back, lower traps pull them down." },
+    { k: "Lower Back", note: "Spinal erectors. Hip hinges also load the glutes and hamstrings." },
+    { k: "Shoulders", note: "The deltoid has three heads: front, side (lateral) and rear. Presses hit the front and side heads, raises isolate the side head, reverse flys hit the rear head." },
+    { k: "Biceps", note: "Every curl works all heads. Long head is favoured with the arm behind or beside the body (stretched). Short head is favoured with the arm in front of the body or a wide grip. Brachialis and brachioradialis take over with a neutral or pronated grip." },
+    { k: "Triceps", note: "Every exercise works all three heads. Long head (inner, back of the arm) crosses the shoulder, so overhead and stretched positions load it most. Lateral head (outer) and medial head (deep, often called the short head) work hardest in pushdowns and dips." },
+    { k: "Forearms", note: "Wrist flexors on the palm side, wrist extensors on the back, plus grip strength." },
+    { k: "Quads", note: "Four heads. Rectus femoris crosses the hip, so knee extensions hit it hardest. Squats and presses load all the vasti (lateralis, medialis, intermedius)." },
+    { k: "Hamstrings", note: "Hip hinges train the long hamstring heads at the hip. Leg curls train knee flexion, including the short head of the biceps femoris." },
+    { k: "Glutes", note: "Glute max extends the hip. Glute medius and minimus (upper, side glutes) abduct the hip." },
+    { k: "Calves", note: "Gastrocnemius works best with the knee straight. Soleus works best with the knee bent." },
+    { k: "Abs & Core", note: "Rectus abdominis flexes the spine, obliques rotate and bend it, deep core resists movement." },
+    { k: "Hips", note: "Adductors pull the legs together, abductors push them out." }
+  ];
+  var EXDB = {
+    Chest: [
+      ["Bench Press (Barbell)", "Mid chest · front delts, triceps"], ["Bench Press (Dumbbell)", "Mid chest · longer stretch than barbell"],
+      ["Bench Press (Smith Machine)", "Mid chest"], ["Chest Press (Machine)", "Mid chest"],
+      ["Incline Bench Press (Barbell)", "Upper chest (clavicular head)"], ["Incline Bench Press (Dumbbell)", "Upper chest (clavicular head)"],
+      ["Incline Bench Press (Smith Machine)", "Upper chest (clavicular head)"], ["Incline Chest Press (Machine)", "Upper chest (clavicular head)"],
+      ["Low Incline Dumbbell Press", "Upper chest · 15–30° bench angle"], ["Decline Bench Press (Barbell)", "Lower chest (sternal head)"],
+      ["Decline Bench Press (Dumbbell)", "Lower and mid chest"], ["Decline Chest Press (Machine)", "Lower chest"],
+      ["Chest Dip", "Lower chest · triceps"], ["Chest Fly (Dumbbell)", "Mid chest · stretched position"],
+      ["Incline Chest Fly (Dumbbell)", "Upper chest"], ["Butterfly (Pec Deck)", "Mid chest · inner chest squeeze"],
+      ["Cable Fly (Mid)", "Mid chest · constant tension"], ["Low-to-High Cable Fly", "Upper chest"],
+      ["High-to-Low Cable Fly", "Lower chest"], ["Svend Press", "Inner chest · light isolation"],
+      ["Push Up", "Mid chest · triceps, front delts"], ["Decline Push Up", "Upper chest · feet elevated"]
+    ],
+    Back: [
+      ["Pull Up", "Lats · wide grip"], ["Chin Up", "Lats · biceps"], ["Neutral Grip Pull Up", "Lats (lower) · biceps"],
+      ["Assisted Pull Up (Machine)", "Lats"], ["Lat Pulldown (Cable)", "Lats · wide grip"],
+      ["Close Grip Lat Pulldown (Cable)", "Lower lats"], ["Reverse Grip Lat Pulldown (Cable)", "Lower lats · biceps"],
+      ["Single Arm Lat Pulldown (Cable)", "Lats · unilateral"], ["Straight Arm Pulldown (Cable)", "Lats · isolation"],
+      ["Bent Over Row (Barbell)", "Lats and mid back"], ["Pendlay Row (Barbell)", "Mid and upper back"],
+      ["Bent Over Row (Smith Machine)", "Lats and mid back"], ["Seated Row (Cable)", "Mid back (rhomboids, mid traps) · lats"],
+      ["Seated Cable Row (D Handle)", "Lats · mid back"], ["Wide Grip Seated Row (Cable)", "Mid and upper back · rear delts"],
+      ["One Arm Row (Dumbbell)", "Lats"], ["Chest Supported Row (Dumbbell)", "Mid and upper back"],
+      ["T Bar Row", "Mid back · lats"], ["Row (Machine)", "Mid back"], ["Inverted Row", "Mid back · biceps"],
+      ["Meadows Row", "Lats · upper back"]
+    ],
+    Traps: [
+      ["Shrug (Barbell)", "Upper traps"], ["Shrug (Dumbbell)", "Upper traps"], ["Shrug (Smith Machine)", "Upper traps"],
+      ["Shrug (Cable)", "Upper traps"], ["Face Pull (Cable)", "Mid and lower traps · rear delts"],
+      ["Prone Y Raise", "Lower traps"], ["Rack Pull", "Upper traps · upper back"], ["Farmer's Walk", "Upper traps · grip"]
+    ],
+    "Lower Back": [
+      ["Back Extension", "Spinal erectors · glutes"], ["Reverse Hyperextension", "Glutes · lower back"],
+      ["Good Morning (Barbell)", "Lower back · hamstrings"], ["Deadlift (Barbell)", "Lower back · glutes · hamstrings"],
+      ["Superman Hold", "Spinal erectors"], ["Rack Pull", "Lower back · upper back"]
+    ],
+    Shoulders: [
+      ["Overhead Press (Barbell)", "Front and side delts"], ["Seated Overhead Press (Barbell)", "Front and side delts"],
+      ["Seated Shoulder Press (Dumbbell)", "Front and side delts"], ["Arnold Press (Dumbbell)", "Front and side delts"],
+      ["Shoulder Press (Machine)", "Front delts"], ["Shoulder Press (Smith Machine)", "Front and side delts"],
+      ["Landmine Press", "Front delts · upper chest"], ["Front Raise (Dumbbell)", "Front delts"],
+      ["Front Raise (Cable)", "Front delts"], ["Plate Front Raise", "Front delts"],
+      ["Lateral Raise (Dumbbell)", "Side delts"], ["Seated Lateral Raise (Dumbbell)", "Side delts"],
+      ["Lateral Raise (Cable)", "Side delts · constant tension"], ["Lateral Raise (Machine)", "Side delts"],
+      ["Cross Body Lateral Raise (Cable)", "Side delts · stretched position"], ["Upright Row (Barbell)", "Side delts · upper traps"],
+      ["Upright Row (Cable)", "Side delts · upper traps"], ["Rear Delt Reverse Fly (Dumbbell)", "Rear delts"],
+      ["Rear Delt Reverse Fly (Machine)", "Rear delts"], ["Reverse Fly (Cable)", "Rear delts"],
+      ["Face Pull (Cable)", "Rear delts · rotator cuff"], ["Bent Over Rear Delt Row (Dumbbell)", "Rear delts · upper back"]
+    ],
+    Biceps: [
+      ["Bicep Curl (Barbell)", "Both heads · brachioradialis"], ["EZ Bar Curl", "Both heads"],
+      ["Bicep Curl (Dumbbell)", "Both heads"], ["Bicep Curl (Cable)", "Both heads · constant tension"],
+      ["Incline Curl (Dumbbell)", "Long head · arm behind the body"], ["Drag Curl (Barbell)", "Long head"],
+      ["Bayesian Curl (Cable)", "Long head · stretched position"], ["Preacher Curl (EZ Bar)", "Short head"],
+      ["Preacher Curl (Dumbbell)", "Short head"], ["Preacher Curl (Machine)", "Short head"],
+      ["Spider Curl (Dumbbell)", "Short head · arm in front of the body"], ["Concentration Curl", "Short head"],
+      ["Wide Grip Curl (Barbell)", "Short head"], ["High Cable Curl", "Short head · arm raised"],
+      ["Hammer Curl (Dumbbell)", "Brachialis · brachioradialis"], ["Cross Body Hammer Curl", "Brachialis · brachioradialis"],
+      ["Hammer Curl (Cable Rope)", "Brachialis · brachioradialis"], ["Reverse Curl (Barbell)", "Brachioradialis · brachialis · forearms"],
+      ["Zottman Curl", "Biceps up, brachioradialis down"]
+    ],
+    Triceps: [
+      ["Triceps Pushdown (Cable, Rope)", "Lateral and medial head"], ["Triceps Pushdown (Cable, Bar)", "Lateral and medial head"],
+      ["Reverse Grip Pushdown (Cable)", "Medial (short) head"], ["Single Arm Pushdown (Cable)", "Lateral and medial head"],
+      ["Overhead Triceps Extension (Cable, Rope)", "Long head"], ["Overhead Triceps Extension (Dumbbell)", "Long head"],
+      ["Overhead Triceps Extension (EZ Bar)", "Long head"], ["Single Arm Overhead Extension (Cable)", "Long head"],
+      ["Skullcrusher (EZ Bar)", "Long head · all heads"], ["Skullcrusher (Dumbbell)", "Long head · all heads"],
+      ["Incline Skullcrusher (EZ Bar)", "Long head · stretched position"], ["Incline Kickback (Dumbbell)", "Long head"],
+      ["Triceps Kickback (Dumbbell)", "Lateral and long head"], ["Triceps Kickback (Cable)", "Lateral and long head"],
+      ["Close Grip Bench Press (Barbell)", "All heads · lateral and medial · chest"], ["JM Press", "Lateral and medial head"],
+      ["Triceps Dip", "Lateral and medial head"], ["Bench Dip", "Lateral and medial head"],
+      ["Diamond Push Up", "Lateral and medial head · chest"], ["Triceps Extension (Machine)", "All heads"]
+    ],
+    Forearms: [
+      ["Wrist Curl (Barbell)", "Wrist flexors"], ["Wrist Curl (Dumbbell)", "Wrist flexors"], ["Reverse Wrist Curl (Barbell)", "Wrist extensors"],
+      ["Reverse Curl (Barbell)", "Brachioradialis · wrist extensors"], ["Farmer's Walk", "Grip · forearms"],
+      ["Dead Hang", "Grip · forearms"], ["Plate Pinch", "Grip · fingers and thumb"]
+    ],
+    Quads: [
+      ["Squat (Barbell)", "Quads · glutes · all vasti"], ["Front Squat (Barbell)", "Quads · more upright torso"],
+      ["Squat (Smith Machine)", "Quads · glutes"], ["Goblet Squat (Dumbbell)", "Quads · glutes"],
+      ["Hack Squat (Machine)", "Quads · vastus lateralis and medialis"], ["Pendulum Squat (Machine)", "Quads"],
+      ["Leg Press (Machine)", "Quads · glutes"], ["Leg Press Horizontal (Machine)", "Quads · glutes"],
+      ["Leg Extension (Machine)", "Rectus femoris · isolation"], ["Single Leg Extension (Machine)", "Rectus femoris · isolation"],
+      ["Bulgarian Split Squat", "Quads · glutes"], ["Walking Lunge (Dumbbell)", "Quads · glutes"],
+      ["Reverse Lunge (Dumbbell)", "Glutes · quads"], ["Step Up (Dumbbell)", "Quads · glutes"], ["Sissy Squat", "Quads · rectus femoris"]
+    ],
+    Hamstrings: [
+      ["Romanian Deadlift (Barbell)", "Hamstrings (hip hinge) · glutes"], ["Romanian Deadlift (Dumbbell)", "Hamstrings (hip hinge) · glutes"],
+      ["Stiff Leg Deadlift (Barbell)", "Hamstrings (hip hinge)"], ["Single Leg Romanian Deadlift (Dumbbell)", "Hamstrings · glutes · balance"],
+      ["Lying Leg Curl (Machine)", "Knee flexion · includes biceps femoris short head"], ["Seated Leg Curl (Machine)", "Knee flexion · hamstrings stretched at the hip"],
+      ["Standing Leg Curl (Machine)", "Knee flexion · single leg"], ["Nordic Hamstring Curl", "Hamstrings · eccentric"],
+      ["Glute Ham Raise", "Hamstrings · glutes"], ["Good Morning (Barbell)", "Hamstrings · lower back"], ["Deadlift (Barbell)", "Hamstrings · glutes · lower back"]
+    ],
+    Glutes: [
+      ["Hip Thrust (Barbell)", "Glute max"], ["Hip Thrust (Machine)", "Glute max"], ["Glute Bridge (Barbell)", "Glute max"],
+      ["Cable Kickback", "Glute max"], ["Cable Pull Through", "Glutes · hamstrings"],
+      ["Hip Abduction (Machine)", "Glute medius and minimus"], ["Sumo Deadlift (Barbell)", "Glutes · adductors · quads"],
+      ["Deadlift (Barbell)", "Glutes · hamstrings · lower back"], ["Bulgarian Split Squat", "Glutes · quads"],
+      ["Step Up (Dumbbell)", "Glutes · quads"], ["Reverse Hyperextension", "Glute max · lower back"], ["Frog Pump", "Glute max"]
+    ],
+    Calves: [
+      ["Standing Calf Raise (Machine)", "Gastrocnemius · knee straight"], ["Standing Calf Raise (Smith Machine)", "Gastrocnemius · knee straight"],
+      ["Seated Calf Raise (Machine)", "Soleus · knee bent"], ["Leg Press Calf Raise", "Gastrocnemius"],
+      ["Donkey Calf Raise", "Gastrocnemius · stretched position"], ["Single Leg Calf Raise", "Gastrocnemius"],
+      ["Tibialis Raise", "Tibialis anterior (front of the shin)"]
+    ],
+    "Abs & Core": [
+      ["Crunch", "Upper abs (rectus abdominis)"], ["Cable Crunch", "Rectus abdominis"], ["Decline Crunch", "Rectus abdominis"],
+      ["Crunch (Machine)", "Rectus abdominis"], ["Sit Up", "Rectus abdominis · hip flexors"],
+      ["Hanging Leg Raise", "Lower abs · hip flexors"], ["Hanging Knee Raise", "Lower abs · hip flexors"],
+      ["Lying Leg Raise", "Lower abs · hip flexors"], ["Ab Wheel Rollout", "Rectus abdominis · deep core"],
+      ["Plank", "Deep core · stability"], ["Side Plank", "Obliques · deep core"], ["Russian Twist", "Obliques"],
+      ["Cable Woodchopper", "Obliques"], ["Pallof Press", "Deep core · anti-rotation"]
+    ],
+    Hips: [
+      ["Hip Adduction (Machine)", "Adductors"], ["Hip Abduction (Machine)", "Glute medius · abductors"],
+      ["Cable Hip Abduction", "Glute medius · abductors"], ["Copenhagen Plank", "Adductors · obliques"],
+      ["Sumo Squat (Dumbbell)", "Adductors · glutes · quads"], ["Lateral Lunge", "Adductors · glutes"]
+    ]
+  };
+  var TYPES = ["N", "W", "D", "F"];
+  var TYPE_NAME = { N: "Normal set", W: "Warm-up set", D: "Drop set", F: "Failure set" };
+  var IC = {
+    back: '<svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"></path></svg>',
+    down: '<svg viewBox="0 0 24 24"><path d="M5 9l7 7 7-7"></path></svg>',
+    dots: '<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle></svg>',
+    clip: '<svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"></rect><path d="M9 4V3h6v1M9 10h6M9 14h6"></path></svg>',
+    plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>',
+    timer: '<svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2 2M10 2h4"></path></svg>',
+    check: '<svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"></polyline></svg>'
+  };
+  var uid = function () { return Math.random().toString(36).slice(2, 9); };
+  var esc = function (s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  var fmt = function (n) { n = +n || 0; return String(Math.round(n * 100) / 100); };
+  var show = function (n) { return n ? fmt(n) : ""; };
+  var parse = function (v) { var n = parseFloat(String(v).replace(",", ".")); return isFinite(n) && n >= 0 ? n : 0; };
+  var setTxt = function (s) { return (s.kg ? fmt(s.kg) + " kg" : "BW") + " × " + s.reps; };
+  var clock = function (sec) {
+    sec = Math.max(0, Math.round(sec)); var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(s).padStart(2, "0");
+  };
+  var restTxt = function (s) { return s ? Math.floor(s / 60) + "min " + (s % 60) + "s" : "Off"; };
+  var newSet = function (type, kg, reps) { return { type: type || "N", kg: kg || 0, reps: reps || 0 }; };
+  var labels = function (sets) { var n = 0; return sets.map(function (s) { if (s.type === "N") { n++; return String(n); } return s.type; }); };
+
+  function load() {
+    try { var o = JSON.parse(localStorage.getItem(KEY)); if (o && o.routines && o.history) return o; } catch (e) {}
+    return { updatedAt: 0, sound: true, routines: [], history: [], session: null };
+  }
+  var S = load(), route = { v: "home" }, menu = null, syncState = "local";
+
+  /* ---------- persistence ---------- */
+  var dbDoc = null, dirty = false, pushing = false, pushTimer = 0;
+  function setSync(k) {
+    syncState = k; var el = document.getElementById("sync");
+    if (el) el.textContent = { ok: "Synced to your account", pending: "Saving…", err: "Sync error", local: "Saved on this device only" }[k] || "";
+  }
+  function save() {
+    S.updatedAt = Date.now(); if (S.history.length > 400) S.history.length = 400;
+    try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
+    if (dbDoc) { dirty = true; setSync("pending"); clearTimeout(pushTimer); pushTimer = setTimeout(flush, 1000); }
+  }
+  function flush() {
+    if (!dbDoc || pushing || !dirty) return; pushing = true; dirty = false;
+    dbDoc.set({ state: JSON.parse(JSON.stringify(S)) }).then(function () { setSync("ok"); }, function () { setSync("err"); })
+      .then(function () { pushing = false; if (dirty) pushTimer = setTimeout(flush, 500); });
+  }
+  function initDb() {
+    var c = window.claude; if (!c || !c.use) return;
+    Promise.all([c.use("db"), c.use("user")]).then(function (r) {
+      var db = r[0], user = r[1]; if (!db || !user) return null;
+      return user.id().then(function (id) {
+        if (!id) return;
+        var d = db.doc("data/users/" + id + "/" + DOC);
+        return d.get().then(function (snap) {
+          dbDoc = d; var remote = snap.exists && snap.data() && snap.data().state;
+          if (remote && remote.routines && (remote.updatedAt || 0) > (S.updatedAt || 0)) {
+            S = remote; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
+            render(); syncWake();
+          } else if (S.updatedAt) { dirty = true; flush(); }
+          setSync("ok");
+        });
+      });
+    }).catch(function () { setSync("local"); });
+  }
+
+  /* ---------- helpers ---------- */
+  function lastPerf(name) {
+    var k = name.trim().toLowerCase();
+    for (var i = 0; i < S.history.length; i++) {
+      var e = S.history[i].exercises.find(function (x) { return x.name.trim().toLowerCase() === k; });
+      if (e && e.sets.length) return e;
+    }
+    return null;
+  }
+  function volOf(sets) { return sets.reduce(function (a, s) { return a + (s.type === "W" ? 0 : s.kg * s.reps); }, 0); }
+  function sessStats() {
+    var done = 0, total = 0, vol = 0; if (!S.session) return { done: 0, total: 0, vol: 0 };
+    S.session.exercises.forEach(function (e) { e.sets.forEach(function (x) { total++; if (x.done) { done++; if (x.type !== "W") vol += x.kg * x.reps; } }); });
+    return { done: done, total: total, vol: vol };
+  }
+  function toast(msg) { var t = document.getElementById("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(function () { t.hidden = true; }, 2600); }
+  function monday() { var d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7)); }
+  function arm(b, fn) {
+    if (b.dataset.armed) { clearTimeout(+b.dataset.armed); fn(); return; }
+    var old = b.innerHTML; b.classList.add("armed"); b.textContent = b.dataset.confirm || "Tap again to confirm";
+    b.dataset.armed = setTimeout(function () { delete b.dataset.armed; b.classList.remove("armed"); b.innerHTML = old; }, 3500);
+  }
+  function routine() { return S.routines.find(function (r) { return r.id === route.id; }); }
+  function exList() { return route.v === "session" ? (S.session ? S.session.exercises : []) : (routine() ? routine().exercises : []); }
+  function dayPart() { var h = new Date().getHours(); return h < 5 ? "Night" : h < 12 ? "Morning" : h < 17 ? "Afternoon" : h < 21 ? "Evening" : "Night"; }
+
+  /* ---------- rest timer ---------- */
+  var T = { state: "idle", end: 0, total: 0, iv: 0, hide: 0, label: "" }, actx = null, tEl = document.getElementById("timer");
+  function ensureAudio() { try { if (!actx) { var C = window.AudioContext || window.webkitAudioContext; if (C) actx = new C(); } if (actx && actx.state === "suspended") actx.resume(); } catch (e) {} }
+  function beep() {
+    if (!S.sound) return;
+    try {
+      ensureAudio(); if (!actx) return;
+      [0, 0.28, 0.56].forEach(function (d, i) {
+        var o = actx.createOscillator(), g = actx.createGain(), t0 = actx.currentTime + d;
+        o.frequency.value = i === 2 ? 1175 : 880; o.type = "sine";
+        g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.35, t0 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.2);
+        o.connect(g); g.connect(actx.destination); o.start(t0); o.stop(t0 + 0.22);
+      });
+    } catch (e) {}
+  }
+  function startRest(sec, label) { ensureAudio(); clearInterval(T.iv); clearTimeout(T.hide); T.total = sec; T.end = Date.now() + sec * 1000; T.state = "run"; T.label = label; T.iv = setInterval(tick, 250); tick(); }
+  function stopRest() { clearInterval(T.iv); clearTimeout(T.hide); T.state = "idle"; tEl.hidden = true; }
+  function tick() {
+    var left = Math.max(0, Math.ceil((T.end - Date.now()) / 1000));
+    if (T.state === "run" && left <= 0) {
+      T.state = "done"; clearInterval(T.iv); beep();
+      try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) {}
+      T.hide = setTimeout(stopRest, 10000);
+    }
+    tEl.hidden = false; tEl.classList.toggle("done", T.state === "done");
+    document.getElementById("t-time").textContent = T.state === "done" ? "Rest over" : clock(left);
+    document.getElementById("t-label").textContent = T.state === "done" ? "Next set" : (T.label || "Rest");
+    document.getElementById("t-skip").textContent = T.state === "done" ? "OK" : "Skip";
+    document.getElementById("ring").style.strokeDashoffset = String(138.23 * (1 - (T.state === "done" ? 0 : Math.min(1, left / T.total))));
+  }
+  tEl.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-t]"); if (!b) return; var a = b.dataset.t;
+    if (a === "skip") { stopRest(); return; }
+    var d = a === "plus" ? 15000 : -15000;
+    if (T.state === "done") { T.end = Date.now() + 15000; T.total = 15; T.state = "run"; clearTimeout(T.hide); clearInterval(T.iv); T.iv = setInterval(tick, 250); }
+    else { T.end = Math.max(Date.now() + 1000, T.end + d); T.total = Math.max(15, T.total + d / 1000); }
+    tick();
+  });
+
+  var wake = null;
+  function syncWake() {
+    try {
+      if (S.session && document.visibilityState === "visible" && navigator.wakeLock && !wake) navigator.wakeLock.request("screen").then(function (w) { wake = w; w.addEventListener("release", function () { wake = null; }); }, function () {});
+      else if (!S.session && wake) { wake.release(); wake = null; }
+    } catch (e) {}
+  }
+  document.addEventListener("visibilitychange", syncWake);
+
+  /* ---------- views ---------- */
+  function render() {
+    if (route.v === "session" && !S.session) route = { v: "home" };
+    if (route.v === "edit" && !routine()) route = { v: "home" };
+    var html = route.v === "home" ? vHome() : route.v === "history" ? vHistory() : route.v === "edit" ? vEdit() : vSession();
+    document.getElementById("view").innerHTML = html;
+    var nonav = route.v === "edit" || route.v === "session";
+    document.body.classList.toggle("nonav", nonav); document.getElementById("nav").hidden = nonav;
+    ["home", "history"].forEach(function (k) { var b = document.getElementById("nav-" + k); if (route.v === k) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
+    setSync(syncState); updateStats();
+  }
+  function vHome() {
+    var cards = S.routines.map(function (r) {
+      var open = menu === "r:" + r.id;
+      return '<article class="rcard"><div class="rhead"><h3>' + esc(r.name) + '</h3><button class="dots" data-act="menu" data-key="r:' + r.id + '" aria-label="Routine options" aria-expanded="' + open + '">' + IC.dots + "</button></div>" +
+        '<p class="rex">' + (r.exercises.length ? esc(r.exercises.map(function (e) { return e.name; }).join(", ")) : "No exercises yet") + "</p>" +
+        (open ? '<div class="menu"><button class="btn small" data-act="edit-routine" data-id="' + r.id + '">Edit</button><button class="btn small" data-act="dup" data-id="' + r.id + '">Duplicate</button><button class="btn small plain" data-act="del-routine" data-id="' + r.id + '" data-confirm="Tap again to delete">Delete</button></div>' : "") +
+        '<button class="btn primary block" data-act="start" data-id="' + r.id + '"' + (r.exercises.length ? "" : " disabled") + ">Start Routine</button></article>";
+    }).join("");
+    var resume = S.session ? '<div class="resume"><div><b>Workout in progress</b><span>' + esc(S.session.name) + '</span></div><button class="btn primary small" data-act="resume">Resume</button></div>' : "";
+    return '<header class="bar"><h1>Workout</h1><div class="bar-r"><button class="chip" data-act="sound" aria-pressed="' + S.sound + '">Sound: ' + (S.sound ? "on" : "off") + '</button><span class="sync" id="sync"></span></div></header>' + resume +
+      '<div class="two"><button class="tile" data-act="new-routine">' + IC.clip + 'New Routine</button><button class="tile" data-act="start-empty">' + IC.plus + 'Start Empty Workout</button></div>' +
+      '<p class="eyebrow">My Routines (' + S.routines.length + ")</p>" +
+      (cards || '<div class="empty"><p>Create a routine for each training day, like Push, Pull, Legs, Upper or Lower.</p><button class="btn primary" data-act="new-routine">New Routine</button></div>');
+  }
+
+  function exCard(e, live) {
+    var lp = live ? lastPerf(e.name) : null, labs = labels(e.sets), open = menu === "e:" + e.id;
+    var head = live ? '<div class="thead"><span>SET</span><span>PREVIOUS</span><span>KG</span><span>REPS</span><span></span></div>' : '<div class="thead"><span>SET</span><span>KG</span><span>REPS</span></div>';
+    var rows = e.sets.map(function (s, i) {
+      return '<div class="srow' + (live ? " live" : "") + (i % 2 ? " alt" : "") + (s.done ? " done" : "") + '" data-set="' + i + '">' +
+        '<button class="stype ' + s.type + '" data-act="stype" aria-label="' + TYPE_NAME[s.type] + ', tap to change">' + labs[i] + "</button>" +
+        (live ? '<button class="prev" data-act="useprev"' + (lp && lp.sets[i] ? ' aria-label="Use previous values"' : " disabled") + ">" + (lp && lp.sets[i] ? esc(fmt(lp.sets[i].kg) + " × " + lp.sets[i].reps) : "–") + "</button>" : "") +
+        '<input data-f="kg" inputmode="decimal" placeholder="0" value="' + show(s.kg) + '" aria-label="Set ' + (i + 1) + ' kilograms">' +
+        '<input data-f="reps" inputmode="numeric" placeholder="0" value="' + show(s.reps) + '" aria-label="Set ' + (i + 1) + ' reps">' +
+        (live ? '<button class="chk" data-act="toggle" aria-label="Set ' + (i + 1) + ' done" aria-pressed="' + !!s.done + '">' + IC.check + "</button>" : "") + "</div>";
+    }).join("");
+    return '<section class="ex" data-ex="' + e.id + '"><div class="ex-head"><h3 class="exname">' + esc(e.name) + '</h3><button class="dots" data-act="menu" data-key="e:' + e.id + '" aria-label="Exercise options" aria-expanded="' + open + '">' + IC.dots + "</button></div>" +
+      (open ? '<div class="menu"><button class="btn small" data-act="ex-up">Move up</button><button class="btn small" data-act="ex-down">Move down</button><button class="btn small" data-act="del-set">Remove last set</button><button class="btn small plain" data-act="ex-remove" data-confirm="Tap again to remove">Remove exercise</button></div>' : "") +
+      '<div class="rest">' + IC.timer + 'Rest Timer: <button class="btn" data-act="rest" data-d="-15" aria-label="Less rest">−</button><b data-rest>' + restTxt(e.rest) + '</b><button class="btn" data-act="rest" data-d="15" aria-label="More rest">+</button></div>' +
+      head + rows + '<button class="btn block" data-act="add-set">+ Add Set</button></section>';
+  }
+  function addBlock() {
+    return '<button class="btn primary block" data-act="open-picker">+ Add Exercise</button>';
+  }
+  function vEdit() {
+    var r = routine();
+    return '<header class="bar topbar"><button class="circle" data-act="back" aria-label="Back">' + IC.back + "</button><h2>Routine</h2><button class=\"btn primary small\" data-act=\"back\">Done</button></header>" +
+      '<input class="rname" id="rname" placeholder="Routine title (e.g. Push)" value="' + esc(r.name) + '" aria-label="Routine title" autocomplete="off">' +
+      r.exercises.map(function (e) { return exCard(e, false); }).join("") + addBlock();
+  }
+  function vSession() {
+    var s = S.session;
+    return '<header class="bar topbar"><button class="circle" data-act="minimize" aria-label="Minimize workout">' + IC.down + "</button><h2>" + esc(s.name) + '</h2><button class="btn primary small" data-act="finish" data-confirm="Tap to confirm">Finish</button></header>' +
+      '<div class="metrics"><div><small>Duration</small><b id="st-time">0:00</b></div><div><small>Volume</small><b id="st-vol">0 kg</b></div><div><small>Sets</small><b id="st-sets">0</b></div></div>' +
+      '<div class="stack live">' + s.exercises.map(function (e) { return exCard(e, true); }).join("") + "</div>" + addBlock() +
+      '<button class="btn plain block" data-act="discard" data-confirm="Tap again to discard workout">Discard Workout</button>';
+  }
+  function updateStats() {
+    var s = S.session; var a = document.getElementById("st-time"); if (!s || !a) return; var st = sessStats();
+    a.textContent = clock((Date.now() - s.startedAt) / 1000);
+    document.getElementById("st-vol").textContent = Math.round(st.vol).toLocaleString("en-GB") + " kg";
+    document.getElementById("st-sets").textContent = st.done + (st.total ? "/" + st.total : "");
+  }
+  setInterval(updateStats, 1000);
+
+  function vHistory() {
+    var mon = monday(), wk = S.history.filter(function (h) { return new Date(h.date) >= mon; });
+    var wkVol = wk.reduce(function (a, h) { return a + h.exercises.reduce(function (b, e) { return b + volOf(e.sets); }, 0); }, 0);
+    var best = {};
+    S.history.slice().reverse().forEach(function (h) { h.exercises.forEach(function (e) { e.sets.forEach(function (s) {
+      if (!s.kg || s.type === "W") return; var b = best[e.name];
+      if (!b || s.kg > b.kg || (s.kg === b.kg && s.reps > b.reps)) best[e.name] = { kg: s.kg, reps: s.reps };
+    }); }); });
+    var prs = Object.keys(best).sort(function (a, b) { return best[b].kg - best[a].kg; }).slice(0, 8).map(function (n) { return '<div class="pr"><span>' + esc(n) + "</span><b>" + fmt(best[n].kg) + " kg × " + best[n].reps + "</b></div>"; }).join("");
+    var list = S.history.map(function (h) {
+      var d = new Date(h.date), sets = h.exercises.reduce(function (a, e) { return a + e.sets.length; }, 0), vol = h.exercises.reduce(function (a, e) { return a + volOf(e.sets); }, 0);
+      var body = h.exercises.map(function (e) { var l = labels(e.sets); return "<p><b>" + esc(e.name) + "</b>" + e.sets.map(function (s, i) { return l[i] + ": " + setTxt(s); }).join("<br>") + "</p>"; }).join("");
+      return '<details class="h"><summary><div><h3>' + esc(h.name) + '</h3><div class="sub">' + d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }) + " · " + Math.max(1, Math.round(h.duration / 60)) + " min · " + sets + ' sets</div></div><div class="vol">' + Math.round(vol).toLocaleString("en-GB") + ' kg</div></summary><div class="hbody">' + body +
+        '<button class="btn small plain" style="align-self:flex-start" data-act="hist-del" data-id="' + h.id + '" data-confirm="Tap again to delete">Delete workout</button></div></details>';
+    }).join("");
+    return '<header class="bar"><h1>History</h1></header><section class="summary"><div><b>' + S.history.length + "</b><small>Workouts</small></div><div><b>" + wk.length + "</b><small>This week</small></div><div><b>" + Math.round(wkVol).toLocaleString("en-GB") + "</b><small>kg this week</small></div></section>" +
+      (prs ? '<section class="panel"><p class="eyebrow" style="margin-bottom:4px">Best sets</p>' + prs + "</section>" : "") +
+      (list || '<div class="empty"><p>Finished workouts show up here.</p><button class="btn primary" data-act="go" data-v="home">Go to Workout</button></div>') + backupHtml();
+  }
+
+  function backupHtml() {
+    return '<section class="panel stack"><p class="eyebrow">Backup</p><p class="muted" style="font-size:14px">Your data is stored only on this device. Save a copy now and then.</p><div class="two"><button class="btn small" data-act="export">Export backup</button><label class="btn small" for="imp" style="cursor:pointer">Restore backup</label></div><input id="imp" type="file" accept="application/json,.json" style="position:absolute;opacity:0;width:1px;height:1px"></section>';
+  }
+  function exportData() {
+    var blob = new Blob([JSON.stringify(S)], { type: "application/json" }), name = "gym-log-backup-" + new Date().toISOString().slice(0, 10) + ".json";
+    try {
+      var f = new File([blob], name, { type: "application/json" });
+      if (navigator.canShare && navigator.canShare({ files: [f] })) { navigator.share({ files: [f], title: "Gym Log backup" }).catch(function () {}); return; }
+    } catch (e) {}
+    var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  }
+  document.addEventListener("change", function (e) {
+    if (e.target.id !== "imp" || !e.target.files[0]) return;
+    var r = new FileReader();
+    r.onload = function () {
+      try {
+        var o = JSON.parse(r.result); if (!o || !Array.isArray(o.routines) || !Array.isArray(o.history)) throw 0;
+        S = o; save(); route = { v: "history" }; render(); toast("Backup restored");
+      } catch (err) { toast("That file is not a Gym Log backup"); }
+    };
+    r.readAsText(e.target.files[0]);
+  });
+
+  /* ---------- actions ---------- */
+  function go(v, id) { route = { v: v, id: id }; menu = null; render(); window.scrollTo(0, 0); }
+  function startSession(r) {
+    S.session = { name: r ? r.name : dayPart() + " Workout", startedAt: Date.now(), exercises: r ? r.exercises.map(function (e) {
+      var lp = lastPerf(e.name);
+      return { id: uid(), name: e.name, rest: e.rest, sets: e.sets.map(function (s, i) {
+        var p = lp && lp.sets[Math.min(i, lp.sets.length - 1)];
+        return { type: s.type, kg: p ? p.kg : s.kg, reps: p ? p.reps : s.reps, done: false };
+      }) };
+    }) : [] };
+    save(); syncWake(); go("session");
+  }
+  function finish() {
+    var s = S.session, exs = [];
+    s.exercises.forEach(function (e) {
+      var d = e.sets.filter(function (x) { return x.done; }).map(function (x) { return { type: x.type, kg: x.kg, reps: x.reps }; });
+      if (d.length) exs.push({ name: e.name, sets: d });
+    });
+    S.session = null; stopRest(); syncWake();
+    if (!exs.length) { save(); go("home"); toast("No sets were completed, nothing saved"); return; }
+    S.history.unshift({ id: uid(), date: new Date().toISOString(), name: s.name, duration: (Date.now() - s.startedAt) / 1000, exercises: exs });
+    save(); go("history"); toast("Workout saved");
+  }
+  function ctx(b) {
+    var exEl = b.closest("[data-ex]"), setEl = b.closest("[data-set]");
+    var e = exEl && exList().find(function (x) { return x.id === exEl.dataset.ex; });
+    return { exEl: exEl, setEl: setEl, e: e, set: e && setEl ? e.sets[+setEl.dataset.set] : null };
+  }
+  function addNames(names) {
+    var live = route.v === "session";
+    names.forEach(function (name) {
+      var lp = lastPerf(name);
+      var sets = lp ? lp.sets.map(function (x) { var n = newSet(x.type, x.kg, x.reps); if (live) n.done = false; return n; }) : [newSet(), newSet(), newSet()];
+      exList().push({ id: uid(), name: name, rest: 90, sets: sets });
+    });
+    save(); render();
+    var all = document.querySelectorAll("[data-ex]"); if (all.length) all[all.length - 1].scrollIntoView({ block: "center" });
+  }
+
+  /* ---------- exercise picker: muscle group -> exercises ---------- */
+  var P = { open: false, muscle: null, q: "", sel: [] };
+  var pkEl = document.getElementById("picker");
+  function allEx() { var out = []; MUSCLES.forEach(function (m) { EXDB[m.k].forEach(function (x) { out.push({ n: x[0], f: x[1], m: m.k }); }); }); return out; }
+  function recentNames() {
+    var seen = {}, out = [];
+    S.history.forEach(function (h) { h.exercises.forEach(function (e) { if (!seen[e.name]) { seen[e.name] = 1; out.push(e.name); } }); });
+    S.routines.forEach(function (r) { r.exercises.forEach(function (e) { if (!seen[e.name]) { seen[e.name] = 1; out.push(e.name); } }); });
+    return out.slice(0, 40);
+  }
+  function pkRow(name, sub) {
+    var on = P.sel.indexOf(name) >= 0;
+    return '<button class="pk-row' + (on ? " on" : "") + '" data-pk="toggle" data-name="' + esc(name) + '" aria-pressed="' + on + '"><span class="pk-ck">' + IC.check + '</span><span class="pk-t"><b>' + esc(name) + "</b>" + (sub ? "<small>" + esc(sub) + "</small>" : "") + "</span></button>";
+  }
+  function pkRender() {
+    var q = P.q.trim().toLowerCase(), html = "", title = "Add Exercise";
+    if (q) {
+      var res = allEx().filter(function (x) { return (x.n + " " + x.f + " " + x.m).toLowerCase().indexOf(q) >= 0; });
+      var seen = {}; res = res.filter(function (x) { if (seen[x.n]) return false; seen[x.n] = 1; return true; });
+      html = res.slice(0, 60).map(function (x) { return pkRow(x.n, x.m + " · " + x.f); }).join("");
+      if (!res.some(function (x) { return x.n.toLowerCase() === q; })) html += '<button class="pk-row custom" data-pk="custom">+ Add “' + esc(P.q.trim()) + "” as a custom exercise</button>";
+    } else if (P.muscle === "Recent") {
+      title = "Recent"; html = recentNames().map(function (n) { return pkRow(n, ""); }).join("");
+    } else if (P.muscle) {
+      var m = MUSCLES.find(function (x) { return x.k === P.muscle; }); title = m.k;
+      html = '<p class="pk-note">' + esc(m.note) + "</p>" + EXDB[m.k].map(function (x) { return pkRow(x[0], x[1]); }).join("");
+    } else {
+      var rec = recentNames().length ? '<button class="pk-tile" data-pk="muscle" data-m="Recent"><b>Recent</b><small>' + recentNames().length + " exercises</small></button>" : "";
+      html = '<div class="pk-tiles">' + rec + MUSCLES.map(function (m) { return '<button class="pk-tile" data-pk="muscle" data-m="' + esc(m.k) + '"><b>' + esc(m.k) + "</b><small>" + EXDB[m.k].length + " exercises</small></button>"; }).join("") + "</div>";
+    }
+    document.getElementById("pk-body").innerHTML = html; document.getElementById("pk-title").textContent = title; pkCount();
+  }
+  function pkCount() { var b = document.getElementById("pk-add"); b.hidden = !P.sel.length; b.textContent = "Add (" + P.sel.length + ")"; }
+  function pkOpen() { P = { open: true, muscle: null, q: "", sel: [] }; document.getElementById("pk-q").value = ""; pkEl.hidden = false; pkEl.scrollTop = 0; document.body.style.overflow = "hidden"; pkRender(); }
+  function pkClose() { P.open = false; pkEl.hidden = true; document.body.style.overflow = ""; }
+  pkEl.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-pk]"); if (!b) return; var a = b.dataset.pk;
+    if (a === "back") { if (P.q) { P.q = ""; document.getElementById("pk-q").value = ""; pkRender(); } else if (P.muscle) { P.muscle = null; pkRender(); pkEl.scrollTop = 0; } else pkClose(); }
+    else if (a === "muscle") { P.muscle = b.dataset.m; pkRender(); pkEl.scrollTop = 0; }
+    else if (a === "toggle") { var n = b.dataset.name, i = P.sel.indexOf(n); if (i >= 0) P.sel.splice(i, 1); else P.sel.push(n); b.classList.toggle("on", i < 0); b.setAttribute("aria-pressed", i < 0 ? "true" : "false"); pkCount(); }
+    else if (a === "custom") { var c = P.q.trim(); if (c && P.sel.indexOf(c) < 0) P.sel.push(c); P.q = ""; document.getElementById("pk-q").value = ""; pkRender(); }
+    else if (a === "add") { var names = P.sel.slice(); pkClose(); addNames(names); }
+  });
+  document.getElementById("pk-q").addEventListener("input", function (e) { P.q = e.target.value; pkRender(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && P.open) pkClose(); });
+
+  var A = {
+    go: function (b) { go(b.dataset.v); },
+    "export": exportData,
+    sound: function () { S.sound = !S.sound; if (S.sound) ensureAudio(); save(); render(); },
+    menu: function (b) { menu = menu === b.dataset.key ? null : b.dataset.key; render(); },
+    "new-routine": function () { var r = { id: uid(), name: "", exercises: [] }; S.routines.push(r); save(); go("edit", r.id); var n = document.getElementById("rname"); if (n) n.focus(); },
+    "edit-routine": function (b) { go("edit", b.dataset.id); },
+    dup: function (b) {
+      var r = S.routines.find(function (x) { return x.id === b.dataset.id; });
+      var c = JSON.parse(JSON.stringify(r)); c.id = uid(); c.name = r.name + " (copy)"; c.exercises.forEach(function (e) { e.id = uid(); });
+      S.routines.push(c); menu = null; save(); render(); toast("Routine duplicated");
+    },
+    "del-routine": function (b) { arm(b, function () { S.routines = S.routines.filter(function (x) { return x.id !== b.dataset.id; }); menu = null; save(); render(); }); },
+    back: function () {
+      var r = routine();
+      if (r) { if (!r.exercises.length && !r.name.trim()) S.routines = S.routines.filter(function (x) { return x !== r; }); else if (!r.name.trim()) r.name = "Untitled routine"; save(); }
+      go("home");
+    },
+    start: function (b) { startSession(S.routines.find(function (x) { return x.id === b.dataset.id; })); },
+    "start-empty": function () { if (S.session) { go("session"); return; } startSession(null); },
+    resume: function () { go("session"); },
+    minimize: function () { go("home"); },
+    finish: function (b) { arm(b, finish); },
+    discard: function (b) { arm(b, function () { S.session = null; stopRest(); save(); syncWake(); go("home"); toast("Workout discarded"); }); },
+    stype: function (b) { var c = ctx(b); c.set.type = TYPES[(TYPES.indexOf(c.set.type) + 1) % TYPES.length]; save(); render(); },
+    toggle: function (b) {
+      var c = ctx(b); c.set.done = !c.set.done; c.setEl.classList.toggle("done", c.set.done); b.setAttribute("aria-pressed", c.set.done ? "true" : "false");
+      save(); updateStats(); if (c.set.done && c.e.rest > 0) startRest(c.e.rest, "Rest · " + c.e.name);
+    },
+    useprev: function (b) {
+      var c = ctx(b), lp = lastPerf(c.e.name), p = lp && lp.sets[+c.setEl.dataset.set]; if (!p) return;
+      c.set.kg = p.kg; c.set.reps = p.reps; c.setEl.querySelector('[data-f="kg"]').value = show(p.kg); c.setEl.querySelector('[data-f="reps"]').value = show(p.reps); save();
+    },
+    "add-set": function (b) { var c = ctx(b), l = c.e.sets[c.e.sets.length - 1]; c.e.sets.push(l ? newSet(l.type === "W" ? "N" : l.type, l.kg, l.reps) : newSet()); save(); render(); },
+    "del-set": function (b) { var c = ctx(b); if (c.e.sets.length > 1) { c.e.sets.pop(); save(); render(); } },
+    rest: function (b) { var c = ctx(b); c.e.rest = Math.min(600, Math.max(0, c.e.rest + +b.dataset.d)); c.exEl.querySelector("[data-rest]").textContent = restTxt(c.e.rest); save(); },
+    "ex-up": function (b) { mv(b, -1); }, "ex-down": function (b) { mv(b, 1); },
+    "ex-remove": function (b) { arm(b, function () { var c = ctx(b), l = exList(); l.splice(l.indexOf(c.e), 1); menu = null; save(); render(); }); },
+    "open-picker": pkOpen,
+    "hist-del": function (b) { arm(b, function () { S.history = S.history.filter(function (h) { return h.id !== b.dataset.id; }); save(); render(); }); }
+  };
+  function mv(b, dir) { var c = ctx(b), l = exList(), i = l.indexOf(c.e), j = i + dir; if (j < 0 || j >= l.length) return; l.splice(i, 1); l.splice(j, 0, c.e); save(); render(); }
+
+  document.addEventListener("click", function (e) { var b = e.target.closest("[data-act]"); if (!b || b.disabled) return; var fn = A[b.dataset.act]; if (fn) fn(b, e); });
+  document.addEventListener("input", function (e) {
+    var t = e.target;
+    if (t.id === "rname") { var r = routine(); if (r) { r.name = t.value; save(); } return; }
+    if (t.dataset.f && t.closest("[data-set]")) { var c = ctx(t); if (!c.set) return; c.set[t.dataset.f] = t.dataset.f === "reps" ? Math.round(parse(t.value)) : parse(t.value); save(); updateStats(); }
+  });
+
+  render(); syncWake(); setSync("local"); initDb();
+})();
+
+if ("serviceWorker" in navigator && location.protocol.indexOf("http") === 0) { window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); }); }
+</script>
+</body>
+</html>
