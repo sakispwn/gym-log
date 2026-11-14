@@ -712,7 +712,7 @@ details.tg summary { cursor: pointer; color: var(--accent-text); font-weight: 60
     r.onload = function () {
       try {
         var o = JSON.parse(r.result); if (!o || !Array.isArray(o.routines) || !Array.isArray(o.history)) throw 0;
-        S = o; save(); route = { v: "history" }; render(); toast("Backup restored");
+        S = fixState(o); save(); route = { v: "history" }; render(); toast("Backup restored");
       } catch (err) { toast("That file is not a SakisGym backup"); }
     };
     r.readAsText(e.target.files[0]);
