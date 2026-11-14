@@ -1,6 +1,6 @@
 {
-  "name": "Gym Log",
-  "short_name": "Gym Log",
+  "name": "SakisGym",
+  "short_name": "SakisGym",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
