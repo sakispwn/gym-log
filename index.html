@@ -178,6 +178,9 @@ body.nonav #timer { bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); }
 .ring .fg { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset .25s linear; }
 #timer.done .fg { stroke: #fff; }
 .t-main { min-width: 0; }
+.t-total { display: block; font-size: 12px; opacity: .75; font-variant-numeric: tabular-nums; }
+.rsum { margin: -4px 2px 12px; font-size: 14px; color: var(--muted); line-height: 1.5; }
+.rsum b { color: var(--ink); font-weight: 650; }
 .t-main b { display: block; font-size: 30px; font-weight: 700; line-height: 1.05; font-variant-numeric: tabular-nums; }
 .t-main span { display: block; font-size: 13px; opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .t-btns { display: flex; gap: 6px; }
@@ -279,7 +282,7 @@ details.tg summary { cursor: pointer; color: var(--accent-text); font-weight: 60
 
 <div id="timer" hidden>
   <div class="ring"><svg viewBox="0 0 52 52" aria-hidden="true"><circle class="bg" cx="26" cy="26" r="22"></circle><circle class="fg" id="ring" cx="26" cy="26" r="22" stroke-dasharray="138.23" stroke-dashoffset="0"></circle></svg></div>
-  <div class="t-main"><b id="t-time">0:00</b><span id="t-label">Rest</span></div>
+  <div class="t-main"><b id="t-time">0:00</b><span id="t-label">Rest</span><span id="t-total" class="t-total"></span></div>
   <div class="t-btns">
     <button type="button" class="adj" data-t="minus" aria-label="15 seconds less">-15</button>
     <button type="button" class="adj" data-t="plus" aria-label="15 seconds more">+15</button>
@@ -571,6 +574,7 @@ details.tg summary { cursor: pointer; color: var(--accent-text); font-weight: 60
   }
   function startRest(sec, label) { ensureAudio(); clearInterval(T.iv); clearTimeout(T.hide); T.total = sec; T.end = Date.now() + sec * 1000; T.state = "run"; T.label = label; T.iv = setInterval(tick, 250); tick(); }
   function stopRest() { clearInterval(T.iv); clearTimeout(T.hide); T.state = "idle"; tEl.hidden = true; }
+  function totalTxt() { var e = document.getElementById("t-total"); if (e) e.textContent = S.session ? "Workout " + clock((Date.now() - S.session.startedAt) / 1000) : ""; }
   function tick() {
     var left = Math.max(0, Math.ceil((T.end - Date.now()) / 1000));
     if (T.state === "run" && left <= 0) {
@@ -578,7 +582,7 @@ details.tg summary { cursor: pointer; color: var(--accent-text); font-weight: 60
       try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) {}
       T.hide = setTimeout(stopRest, 10000);
     }
-    tEl.hidden = false; tEl.classList.toggle("done", T.state === "done");
+    tEl.hidden = false; tEl.classList.toggle("done", T.state === "done"); totalTxt();
     document.getElementById("t-time").textContent = T.state === "done" ? "Rest over" : clock(left);
     document.getElementById("t-label").textContent = T.state === "done" ? "Next set" : (T.label || "Rest");
     document.getElementById("t-skip").textContent = T.state === "done" ? "OK" : "Skip";
@@ -652,10 +656,15 @@ details.tg summary { cursor: pointer; color: var(--accent-text); font-weight: 60
   function addBlock() {
     return '<button class="btn primary block" data-act="open-picker">+ Add Exercise</button>';
   }
+  function rSum(r) {
+    var vm = setsFor(r.exercises, false), parts = MUSCLES.filter(function (m) { return vm[m.k]; }).map(function (m) { return esc(m.k) + " <b>" + vm[m.k] + "</b>"; });
+    if (vm.Unassigned) parts.push("Unassigned <b>" + vm.Unassigned + "</b>");
+    return '<p class="rsum">' + (parts.length ? parts.join(" · ") : "Sets per muscle appear here as you add exercises.") + "</p>";
+  }
   function vEdit() {
     var r = routine();
     return '<header class="bar topbar"><button class="circle" data-act="back" aria-label="Back">' + IC.back + "</button><h2>Routine</h2><button class=\"btn primary small\" data-act=\"back\">Done</button></header>" +
-      '<input class="rname" id="rname" placeholder="Routine title (e.g. Push)" value="' + esc(r.name) + '" aria-label="Routine title" autocomplete="off">' +
+      '<input class="rname" id="rname" placeholder="Routine title (e.g. Push)" value="' + esc(r.name) + '" aria-label="Routine title" autocomplete="off">' + rSum(r) +
       r.exercises.map(function (e) { return exCard(e, false); }).join("") + addBlock() + volEditor(r);
   }
   function vSession() {
@@ -667,7 +676,7 @@ details.tg summary { cursor: pointer; color: var(--accent-text); font-weight: 60
   }
   function updateStats() {
     var s = S.session; var a = document.getElementById("st-time"); if (!s || !a) return; var st = sessStats();
-    a.textContent = clock((Date.now() - s.startedAt) / 1000);
+    a.textContent = clock((Date.now() - s.startedAt) / 1000); totalTxt();
     document.getElementById("st-vol").textContent = Math.round(st.vol).toLocaleString("en-GB") + " kg";
     document.getElementById("st-sets").textContent = st.done + (st.total ? "/" + st.total : "");
   }
